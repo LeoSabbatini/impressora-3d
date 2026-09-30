@@ -1,6 +1,6 @@
 # LHS3D — Custos & Vendas
 
-Calculadora de custo de impressão 3D, controle de vendas, pedidos em kanban e progresso de pagamento da impressora. Os dados ficam salvos no `localStorage` do navegador (não precisa de servidor/banco).
+Calculadora de custo de impressão 3D, controle de vendas, pedidos em kanban e progresso de pagamento da impressora. Os dados ficam salvos num banco de dados compartilhado (Netlify Database), então qualquer dispositivo que abrir o site vê as mesmas informações — sem login nem senha.
 
 ## Estrutura
 
@@ -19,6 +19,10 @@ Basta abrir o `index.html` no navegador. Não precisa de build nem de instalar n
 2. No Netlify: **Add new site → Import an existing project** e conecte o repositório.
 3. Deixe o "Build command" vazio e o "Publish directory" como `.` (raiz) — é um site estático, não precisa de build.
 
-## Observação
+## Banco de dados
 
-Os dados (filamentos, produtos, pedidos, etc.) são salvos por navegador/dispositivo via `localStorage`. Se quiser sincronizar entre dispositivos, isso exigiria conectar a um banco (como a Netlify DB que você mencionou), o que ainda não está implementado aqui.
+Filamentos e tipos, configurações de gastos (kWh e consumo), produtos/itens, impressora e pedidos ficam guardados na tabela `dados` do Netlify Database, acessada pela função `netlify/functions/dados.ts` (`/api/dados`). O navegador também mantém uma cópia local como cache; se a conexão falhar, a alteração fica só naquele dispositivo (o indicador no topo mostra "offline") e pode ser substituída pelos dados do banco na próxima sincronização. Ao voltar para a aba, o site busca as alterações feitas em outros dispositivos.
+
+Na primeira vez que um navegador com dados antigos abre o site e o banco ainda está vazio, esses dados são enviados automaticamente para o banco.
+
+Qualquer pessoa com o link consegue ver e editar os dados.
