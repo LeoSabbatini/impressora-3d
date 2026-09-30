@@ -36,8 +36,9 @@ nav.tabs button.active{color:var(--accent);border-color:var(--accent)}
 label{display:block;font-size:.85rem;color:var(--text-dim);margin-bottom:.9rem}
 label span.lbl{display:block;margin-bottom:.3rem}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:0 .8rem}
-input,select{width:100%;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.55rem .65rem;font:500 .95rem var(--sans);margin-top:.15rem}
-input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input,select,textarea{width:100%;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.55rem .65rem;font:500 .95rem var(--sans);margin-top:.15rem}
+textarea{resize:vertical;min-height:5rem}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 button{font:600 .9rem var(--sans);border:none;border-radius:8px;padding:.65rem 1.1rem;cursor:pointer;background:var(--surface);color:var(--text);border:1px solid var(--border)}
 button:hover{border-color:var(--accent)}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -79,6 +80,7 @@ td input{width:5.5rem;padding:.35rem .45rem;font-family:var(--mono)}
 .kcard:active{cursor:grabbing}
 .kcard b{display:block;font-family:var(--disp);margin-bottom:.3rem}
 .kcard .kitem{color:var(--text-dim);font-size:.8rem}
+.kcard .kdescricao{margin-bottom:.5rem;white-space:pre-wrap;overflow-wrap:anywhere}
 .kcard .kdel{float:right}
 .sync{font-size:.8rem;color:var(--text-dim);margin-left:auto}
 .sync[data-estado="ok"]{color:var(--good)}

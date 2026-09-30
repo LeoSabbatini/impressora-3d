@@ -232,8 +232,9 @@ function renderItensPedidoTemp(){
 
 function criarPedido(){
   if(pedidoItensTemp.length===0){alert('Adicione pelo menos um item ao pedido!');return}
-  pedidos.push({id:uid(),status:'fila',itens:pedidoItensTemp,contabilizado:false,criadoEm:Date.now()});
+  pedidos.push({id:uid(),descricao:$('pedDescricao').value.trim(),status:'fila',itens:pedidoItensTemp,contabilizado:false,criadoEm:Date.now()});
   saveJSON('pedidos3d',pedidos);
+  $('pedDescricao').value='';
   pedidoItensTemp=[]; renderItensPedidoTemp(); renderPedidos();
 }
 
@@ -274,10 +275,17 @@ function renderPedidos(){
       `<div class="kcard" draggable="true" ondragstart="onDragStart(event,'${p.id}')">
         <button class="ghost kdel" onclick="excluirPedido('${p.id}')">✕</button>
         <b>Pedido ${p.id.slice(-4)}</b>
+        ${p.descricao?`<div class="kdescricao">${escaparTexto(p.descricao)}</div>`:''}
         ${p.itens.map(it=>`<div class="kitem">${it.label}</div>`).join('')}
       </div>`
     ).join('')||'<p class="empty" style="font-size:.85rem">Vazio</p>';
   });
+}
+
+function escaparTexto(texto){
+  const elemento=document.createElement('div');
+  elemento.textContent=texto;
+  return elemento.innerHTML;
 }
 
 function salvarImpressora(){

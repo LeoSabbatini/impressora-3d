@@ -25,4 +25,6 @@ Filamentos e tipos, configurações de gastos (kWh e consumo), produtos/itens, i
 
 Na primeira vez que um navegador com dados antigos abre o site e o banco ainda está vazio, esses dados são enviados automaticamente para o banco.
 
+Cada pedido pode incluir uma descrição opcional, exibida no cartão do kanban. O campo `descricao` é salvo junto aos demais dados do pedido na coleção `pedidos3d`, dentro da coluna JSONB `valor` da tabela `dados`, e sincronizado entre dispositivos. Pedidos antigos sem esse campo continuam funcionando. Como a coluna já aceita os atributos de cada pedido em JSON, não foi necessária uma alteração no esquema do banco nem nas migrações existentes.
+
 Qualquer pessoa com o link consegue ver e editar os dados.
