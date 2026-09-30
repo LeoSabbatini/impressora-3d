@@ -80,3 +80,6 @@ td input{width:5.5rem;padding:.35rem .45rem;font-family:var(--mono)}
 .kcard b{display:block;font-family:var(--disp);margin-bottom:.3rem}
 .kcard .kitem{color:var(--text-dim);font-size:.8rem}
 .kcard .kdel{float:right}
+.sync{font-size:.8rem;color:var(--text-dim);margin-left:auto}
+.sync[data-estado="ok"]{color:var(--good)}
+.sync[data-estado="erro"]{color:var(--bad)}

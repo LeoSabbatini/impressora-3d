@@ -1,0 +1,66 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "c6543238-c991-446f-9e98-33e24668ad69",
+  "prevIds": [
+    "00000000-0000-0000-0000-000000000000"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "dados",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "chave",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dados"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "valor",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dados"
+    },
+    {
+      "type": "timestamp",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "atualizado_em",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "dados"
+    },
+    {
+      "columns": [
+        "chave"
+      ],
+      "nameExplicit": false,
+      "name": "dados_pkey",
+      "schema": "public",
+      "table": "dados",
+      "entityType": "pks"
+    }
+  ],
+  "renames": []
+}

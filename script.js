@@ -1,14 +1,60 @@
 const $=id=>document.getElementById(id);
+const CHAVES=['config3d','tipos3d','filamentos3d','produtos3d','impressora3d','pedidos3d'];
 function loadJSON(k,fallback){try{return JSON.parse(localStorage.getItem(k))??fallback}catch{return fallback}}
-function saveJSON(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){console.error('storage',e)}}
-let config=loadJSON('config3d',{kwh:0.95,watts:150});
-let tipos=loadJSON('tipos3d',['PLA','PLA Silk','PETG','ABS','TPU']);
-let filamentos=loadJSON('filamentos3d',[]).map(f=>({...f,id:f.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),tipo:f.tipo||'Outro'}));
-if(filamentos.some(f=>f.tipo==='Outro')&&!tipos.includes('Outro'))tipos.push('Outro');
-saveJSON('filamentos3d',filamentos); saveJSON('tipos3d',tipos);
-let produtos=loadJSON('produtos3d',[]);
-let impressora=loadJSON('impressora3d',{modelo:'',valor:0});
-let pedidos=loadJSON('pedidos3d',[]);
+// Salva no cache local e envia para o banco (compartilhado entre dispositivos).
+const envioPendente={};
+function saveJSON(k,v){
+  try{localStorage.setItem(k,JSON.stringify(v))}catch(e){console.error('storage',e)}
+  clearTimeout(envioPendente[k]);
+  envioPendente[k]=setTimeout(()=>enviarServidor(k,v),300);
+}
+async function enviarServidor(k,v){
+  delete envioPendente[k];
+  try{
+    const r=await fetch('/api/dados/'+k,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(v)});
+    if(!r.ok)throw new Error(r.status);
+    setSync('ok');
+  }catch(e){console.error('sync',e);setSync('erro')}
+}
+function setSync(estado){
+  const el=$('syncStatus'); if(!el)return;
+  el.textContent={ok:'● sincronizado',erro:'● offline (salvo só neste dispositivo)',carregando:'● carregando…'}[estado];
+  el.dataset.estado=estado;
+}
+let config,tipos,filamentos,produtos,impressora,pedidos;
+function aplicarDados(){
+  config=loadJSON('config3d',{kwh:0.95,watts:150});
+  tipos=loadJSON('tipos3d',['PLA','PLA Silk','PETG','ABS','TPU']);
+  filamentos=loadJSON('filamentos3d',[]).map(f=>({...f,id:f.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),tipo:f.tipo||'Outro'}));
+  if(filamentos.some(f=>f.tipo==='Outro')&&!tipos.includes('Outro'))tipos.push('Outro');
+  produtos=loadJSON('produtos3d',[]);
+  impressora=loadJSON('impressora3d',{modelo:'',valor:0});
+  pedidos=loadJSON('pedidos3d',[]);
+}
+aplicarDados();
+// Busca os dados do banco. Se o banco ainda estiver vazio, envia os dados já salvos neste navegador.
+async function carregarServidor(){
+  if(Object.keys(envioPendente).length)return;
+  try{
+    const r=await fetch('/api/dados',{cache:'no-store'});
+    if(!r.ok)throw new Error(r.status);
+    const remoto=await r.json();
+    CHAVES.forEach(k=>{
+      if(k in remoto)localStorage.setItem(k,JSON.stringify(remoto[k]));
+      else if(localStorage.getItem(k)!==null)enviarServidor(k,loadJSON(k,null));
+    });
+    aplicarDados(); renderTudo(); setSync('ok');
+  }catch(e){console.error('sync',e);setSync('erro')}
+}
+function renderTudo(){
+  $('custoKwh').value=config.kwh; $('watts').value=config.watts;
+  $('impModelo').value=impressora.modelo||''; $('impValor').value=impressora.valor||'';
+  renderTipos(); renderFilamentos();
+  const ativa=document.querySelector('nav.tabs button.active')?.dataset.tab;
+  if(ativa==='vendas')renderVendas();
+  if(ativa==='impressora')renderImpressora();
+  if(ativa==='pedidos'){renderProdutoSelectPedido();renderPedidos();}
+}
 let pedidoItensTemp=[];
 let pendente=null;
 const brl=n=>'R$ '+(Number(n)||0).toFixed(2).replace('.',',');
@@ -25,11 +71,10 @@ function showTab(name){
 }
 
 window.onload=()=>{
-  $('custoKwh').value=config.kwh; $('watts').value=config.watts;
-  $('impModelo').value=impressora.modelo||''; $('impValor').value=impressora.valor||'';
-  renderTipos();
-  renderFilamentos();
+  renderTudo(); setSync('carregando'); carregarServidor();
 };
+// Atualiza com as alterações feitas em outros dispositivos ao voltar para a aba.
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')carregarServidor()});
 
 function salvarConfiguracoes(){
   config.kwh=parseFloat($('custoKwh').value)||0;
