@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>LHS3D — Custos & Vendas</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div class="brand">
+    <svg width="40" height="40" viewBox="0 0 48 48" aria-hidden="true">
+      <rect width="48" height="48" rx="12" fill="#1a1d22"/>
+      <rect x="14" y="30" width="20" height="6" rx="3" fill="#ff7a3d"/>
+      <rect x="16" y="22" width="16" height="6" rx="3" fill="#ff8f5c"/>
+      <rect x="18" y="14" width="12" height="6" rx="3" fill="#ffa478"/>
+    </svg>
+    <h1>LHS3D</h1>
+  </div>
+  <span class="tag">custos, vendas e o quanto falta pra impressora se pagar</span>
+</header>
+<nav class="tabs">
+  <button class="active" data-tab="calc" onclick="showTab('calc')">Calculadora</button>
+  <button data-tab="vendas" onclick="showTab('vendas')">Vendas</button>
+  <button data-tab="pedidos" onclick="showTab('pedidos')">Pedidos</button>
+  <button data-tab="impressora" onclick="showTab('impressora')">Impressora</button>
+</nav>
+
+<section id="tab-calc" class="tab active">
+<div class="grid2">
+<div>
+  <div class="card">
+    <h3>Configurações de custo</h3>
+    <div class="row2">
+      <label><span class="lbl">Energia (R$/kWh)</span><input type="number" id="custoKwh" step="0.01" placeholder="0.95"></label>
+      <label><span class="lbl">Potência (W)</span><input type="number" id="watts" placeholder="150"></label>
+    </div>
+    <button class="primary" onclick="salvarConfiguracoes()">Salvar configurações</button>
+  </div>
+  <div class="card">
+    <h3>Novo filamento</h3>
+    <label><span class="lbl">Tipo</span><select id="filTipo"></select></label>
+    <div class="rowAdd"><input type="text" id="novoTipo" placeholder="Novo tipo (ex: Nylon)"><button type="button" onclick="adicionarTipo()">+ Tipo</button></div>
+    <label><span class="lbl">Marca / nome</span><input type="text" id="filNome" placeholder="Esun"></label>
+    <label><span class="lbl">Cor</span><input type="text" id="filCor" placeholder="Preto"></label>
+    <div class="row2">
+      <label><span class="lbl">Preço (R$)</span><input type="number" id="filPreco" step="0.01" placeholder="120.00"></label>
+      <label><span class="lbl">Peso (g)</span><input type="number" id="filPeso" placeholder="1000"></label>
+    </div>
+    <button class="primary" onclick="adicionarFilamento()">Adicionar filamento</button>
+    <div id="listaFilamentos" style="margin-top:.9rem"></div>
+  </div>
+</div>
+<div>
+  <div class="card">
+    <h3>Nova impressão</h3>
+    <label><span class="lbl">Filamento</span><select id="calcFilamento"></select></label>
+    <label><span class="lbl">Nome da peça</span><input type="text" id="pecaNome" placeholder="Vaso Groot"></label>
+    <div class="row2">
+      <label><span class="lbl">Peso da peça (g)</span><input type="number" id="pecaPeso" placeholder="150"></label>
+      <label><span class="lbl">Tempo (h)</span><input type="number" id="pecaHoras" step="0.1" placeholder="5.5"></label>
+    </div>
+    <label><span class="lbl">Margem de lucro sugerida (%)</span><input type="number" id="lucro" placeholder="100"></label>
+    <button class="primary" style="width:100%" onclick="calcularCusto()">Calcular custo final</button>
+  </div>
+  <div class="card result hidden" id="resultadoCard">
+    <h3 id="resNomePeca"></h3>
+    <dl>
+      <dt>Custo de material</dt><dd id="resMaterial"></dd>
+      <dt>Custo de energia</dt><dd id="resEnergia"></dd>
+      <dt>Custo base de produção</dt><dd id="resCustoBase"></dd>
+      <dt class="tot">Preço sugerido de venda</dt><dd class="tot" id="resVenda"></dd>
+    </dl>
+    <button class="primary" style="width:100%;margin-top:1rem" onclick="salvarProduto()">Salvar como produto</button>
+  </div>
+</div>
+</div>
+</section>
+
+<section id="tab-vendas" class="tab">
+<div class="card">
+  <h3>Produtos & vendas</h3>
+  <div class="overflow"><table id="tabelaVendas"><thead><tr>
+    <th>Produto</th><th>Filamento</th><th>Horas (un.)</th><th>Horas (total)</th><th>Custo prod.</th><th>Sugerido</th><th>Venda (R$)</th><th>Vendidos</th><th>Faturado</th><th>Lucro</th><th></th>
+  </tr></thead><tbody></tbody></table></div>
+  <div id="vendasVazio" class="empty hidden">Nenhum produto salvo ainda — calcule e salve um na aba Calculadora.</div>
+</div>
+<div class="card">
+  <h3>Resumo</h3>
+  <div class="stat">Total faturado <b id="totFaturado">R$ 0,00</b></div>
+  <div class="stat">Total custo de produção <b id="totCusto">R$ 0,00</b></div>
+  <div class="stat">Lucro total <b id="totLucro">R$ 0,00</b></div>
+</div>
+</section>
+
+<section id="tab-pedidos" class="tab">
+<div class="card">
+  <h3>Novo pedido</h3>
+  <div class="row2">
+    <label><span class="lbl">Produto</span><select id="pedProduto" onchange="atualizarVariantesSelect()"></select></label>
+    <label><span class="lbl">Filamento/cor</span><select id="pedVariante"></select></label>
+  </div>
+  <div class="rowAdd" style="align-items:flex-end">
+    <label style="flex:1;margin:0"><span class="lbl">Quantidade</span><input type="number" id="pedQtd" min="1" value="1"></label>
+    <button type="button" onclick="adicionarItemPedido()">+ Item</button>
+  </div>
+  <div id="itensPedidoTemp"></div>
+  <button class="primary" style="width:100%;margin-top:.5rem" onclick="criarPedido()">Criar pedido</button>
+</div>
+<div class="kanban">
+  <div class="kcol" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="onDropColuna(event,'fila')">
+    <h4>Na fila</h4><div class="kcards" id="col-fila"></div>
+  </div>
+  <div class="kcol" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="onDropColuna(event,'producao')">
+    <h4>Em produção</h4><div class="kcards" id="col-producao"></div>
+  </div>
+  <div class="kcol" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="onDropColuna(event,'concluido')">
+    <h4>Concluído</h4><div class="kcards" id="col-concluido"></div>
+  </div>
+</div>
+</section>
+
+<section id="tab-impressora" class="tab">
+<div class="card">
+  <h3>Sua impressora</h3>
+  <div class="row2">
+    <label><span class="lbl">Modelo</span><input type="text" id="impModelo" placeholder="Ender 3 V3"></label>
+    <label><span class="lbl">Valor pago (R$)</span><input type="number" id="impValor" step="0.01" placeholder="1200.00"></label>
+  </div>
+  <button class="primary" onclick="salvarImpressora()">Salvar impressora</button>
+</div>
+<div class="card" id="impProgressoCard">
+  <h3>Progresso de pagamento</h3>
+  <p style="color:var(--text-dim);font-size:.85rem">Calculado com o lucro total acumulado nas Vendas.</p>
+  <div class="donut-wrap"><svg viewBox="0 0 180 180">
+    <circle class="donut-track" cx="90" cy="90" r="72"/>
+    <circle class="donut-bar" id="donutBar" cx="90" cy="90" r="72" transform="rotate(-90 90 90)"/>
+    <text x="90" y="86" text-anchor="middle" class="donut-label" id="donutPct">0%</text>
+    <text x="90" y="106" text-anchor="middle" class="donut-sub">pago</text>
+  </svg></div>
+  <div class="stat">Lucro acumulado <b id="impPago">R$ 0,00</b></div>
+  <div class="stat">Valor da impressora <b id="impTotal">R$ 0,00</b></div>
+  <div class="stat">Falta <b id="impFalta">R$ 0,00</b></div>
+</div>
+</section>
+</div>
+<script src="script.js" defer></script>
+</body>
+</html>
