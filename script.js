@@ -232,8 +232,9 @@ function renderItensPedidoTemp(){
 
 function criarPedido(){
   if(pedidoItensTemp.length===0){alert('Adicione pelo menos um item ao pedido!');return}
-  pedidos.push({id:uid(),descricao:$('pedDescricao').value.trim(),status:'fila',itens:pedidoItensTemp,contabilizado:false,criadoEm:Date.now()});
+  pedidos.push({id:uid(),cliente:$('pedCliente').value.trim(),descricao:$('pedDescricao').value.trim(),status:'fila',itens:pedidoItensTemp,contabilizado:false,criadoEm:Date.now()});
   saveJSON('pedidos3d',pedidos);
+  $('pedCliente').value='';
   $('pedDescricao').value='';
   pedidoItensTemp=[]; renderItensPedidoTemp(); renderPedidos();
 }
@@ -275,11 +276,20 @@ function renderPedidos(){
       `<div class="kcard" draggable="true" ondragstart="onDragStart(event,'${p.id}')">
         <button class="ghost kdel" onclick="excluirPedido('${p.id}')">✕</button>
         <b>Pedido ${p.id.slice(-4)}</b>
+        ${p.cliente?`<div class="kcliente">Cliente: ${escaparTexto(p.cliente)}</div>`:''}
+        ${renderDataPedido(p.criadoEm)}
         ${p.descricao?`<div class="kdescricao">${escaparTexto(p.descricao)}</div>`:''}
         ${p.itens.map(it=>`<div class="kitem">${it.label}</div>`).join('')}
       </div>`
     ).join('')||'<p class="empty" style="font-size:.85rem">Vazio</p>';
   });
+}
+
+function renderDataPedido(criadoEm){
+  if(criadoEm===undefined||criadoEm===null||criadoEm==='')return '';
+  const data=new Date(criadoEm);
+  if(Number.isNaN(data.getTime()))return '';
+  return `<time class="kdata" datetime="${data.toISOString()}">Criado em: ${data.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</time>`;
 }
 
 function escaparTexto(texto){
