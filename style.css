@@ -80,6 +80,8 @@ td input{width:5.5rem;padding:.35rem .45rem;font-family:var(--mono)}
 .kcard:active{cursor:grabbing}
 .kcard b{display:block;font-family:var(--disp);margin-bottom:.3rem}
 .kcard .kitem{color:var(--text-dim);font-size:.8rem}
+.kcard .kcliente{margin-bottom:.3rem;overflow-wrap:anywhere}
+.kcard .kdata{display:block;color:var(--text-dim);font-size:.8rem;margin-bottom:.5rem}
 .kcard .kdescricao{margin-bottom:.5rem;white-space:pre-wrap;overflow-wrap:anywhere}
 .kcard .kdel{float:right}
 .sync{font-size:.8rem;color:var(--text-dim);margin-left:auto}
