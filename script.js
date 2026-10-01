@@ -24,9 +24,15 @@ function setSync(estado){
 let config,tipos,filamentos,produtos,impressora,pedidos;
 function aplicarDados(){
   config=loadJSON('config3d',{kwh:0.95,watts:150});
-  tipos=loadJSON('tipos3d',['PLA','PLA Silk','PETG','ABS','TPU']);
   filamentos=loadJSON('filamentos3d',[]).map(f=>({...f,id:f.id||(Date.now().toString(36)+Math.random().toString(36).slice(2,6)),tipo:f.tipo||'Outro'}));
-  if(filamentos.some(f=>f.tipo==='Outro')&&!tipos.includes('Outro'))tipos.push('Outro');
+  tipos=loadJSON('tipos3d',['PLA','PLA Silk','PETG','ABS','TPU']).map(tipo=>{
+    if(typeof tipo!=='string')return tipo;
+    const antigo=filamentos.find(f=>f.tipo===tipo&&Number(f.custoPorGrama)>0);
+    return {nome:tipo,precoKg:antigo?antigo.custoPorGrama*1000:({'PLA':120,'PLA Silk':130}[tipo]??null)};
+  });
+  filamentos.forEach(f=>{
+    if(!tipos.some(tipo=>tipo.nome===f.tipo))tipos.push({nome:f.tipo,precoKg:Number(f.custoPorGrama)>0?f.custoPorGrama*1000:null});
+  });
   produtos=loadJSON('produtos3d',[]);
   impressora=loadJSON('impressora3d',{modelo:'',valor:0});
   pedidos=loadJSON('pedidos3d',[]);
@@ -41,9 +47,11 @@ async function carregarServidor(){
     const remoto=await r.json();
     CHAVES.forEach(k=>{
       if(k in remoto)localStorage.setItem(k,JSON.stringify(remoto[k]));
-      else if(localStorage.getItem(k)!==null)enviarServidor(k,loadJSON(k,null));
+      else if(k!=='tipos3d'&&localStorage.getItem(k)!==null)enviarServidor(k,loadJSON(k,null));
     });
-    aplicarDados(); renderTudo(); setSync('ok');
+    aplicarDados();
+    if(JSON.stringify(loadJSON('tipos3d',null))!==JSON.stringify(tipos))saveJSON('tipos3d',tipos);
+    renderTudo(); setSync('ok');
   }catch(e){console.error('sync',e);setSync('erro')}
 }
 function renderTudo(){
@@ -79,29 +87,40 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 function salvarConfiguracoes(){
   config.kwh=parseFloat($('custoKwh').value)||0;
   config.watts=parseFloat($('watts').value)||0;
-  saveJSON('config3d',config); alert('Configurações salvas!');
+  saveJSON('config3d',config); renderCustoItemPedido(); alert('Configurações salvas!');
 }
 
 function renderTipos(){
   const select=$('filTipo'); const atual=select.value;
-  select.innerHTML=tipos.map(t=>`<option value="${t}">${t}</option>`).join('');
-  if(tipos.includes(atual))select.value=atual;
+  select.replaceChildren(...tipos.map(tipo=>new Option(`${tipo.nome} — ${tipo.precoKg>0?brl(tipo.precoKg)+'/kg':'defina o preço'}`,tipo.nome)));
+  if(tipos.some(tipo=>tipo.nome===atual))select.value=atual;
+  $('listaTipos').innerHTML=tipos.map((tipo,index)=>`<label class="stat"><span>${escaparTexto(tipo.nome)}</span><input style="width:8rem" type="number" min="0.01" step="0.01" aria-label="Preço por kg de ${escaparTexto(tipo.nome)}" value="${tipo.precoKg??''}" placeholder="R$/kg" onchange="atualizarPrecoTipo(${index},this.value)"></label>`).join('');
 }
 
 function adicionarTipo(){
   const t=$('novoTipo').value.trim();
-  if(!t){alert('Digite o nome do tipo!');return}
-  if(!tipos.includes(t))tipos.push(t);
-  saveJSON('tipos3d',tipos); $('novoTipo').value=''; renderTipos(); $('filTipo').value=t;
+  const precoKg=Number($('novoTipoPreco').value);
+  if(!t||!Number.isFinite(precoKg)||precoKg<=0){alert('Informe o nome do tipo e um preço por kg maior que zero!');return}
+  if(tipos.some(tipo=>tipo.nome.toLowerCase()===t.toLowerCase())){alert('Esse tipo já existe. Altere seu preço na lista de preços por tipo.');return}
+  tipos.push({nome:t,precoKg});
+  saveJSON('tipos3d',tipos); $('novoTipo').value=''; $('novoTipoPreco').value=''; renderTipos(); $('filTipo').value=t;
+  renderFilamentos();
+}
+
+function atualizarPrecoTipo(index,valor){
+  const precoKg=Number(valor);
+  if(!Number.isFinite(precoKg)||precoKg<=0){alert('Informe um preço por kg maior que zero!');renderTipos();return}
+  tipos[index].precoKg=precoKg;
+  saveJSON('tipos3d',tipos); renderTipos(); renderFilamentos();
 }
 
 function adicionarFilamento(){
   const tipo=$('filTipo').value, nome=$('filNome').value.trim(), cor=$('filCor').value.trim();
-  const preco=parseFloat($('filPreco').value), peso=parseFloat($('filPeso').value);
-  if(!tipo||!nome||!cor||!preco||!peso){alert('Preencha todos os campos do filamento!');return}
-  filamentos.push({id:uid(),tipo,nome,cor,preco,peso,custoPorGrama:preco/peso});
+  if(!tipo||!nome||!cor){alert('Preencha todos os campos do filamento!');return}
+  if(!(tipos.find(t=>t.nome===tipo)?.precoKg>0)){alert('Defina o preço por kg desse tipo antes de adicionar o filamento!');return}
+  filamentos.push({id:uid(),tipo,nome,cor});
   saveJSON('filamentos3d',filamentos);
-  $('filNome').value='';$('filCor').value='';$('filPreco').value='';$('filPeso').value='';
+  $('filNome').value='';$('filCor').value='';
   renderFilamentos();
 }
 
@@ -110,63 +129,57 @@ function excluirFilamento(id){
 }
 
 function renderFilamentos(){
-  const grupos={};
+  const grupos=Object.create(null);
   filamentos.forEach(f=>{(grupos[f.tipo]=grupos[f.tipo]||[]).push(f)});
   const tiposOrdenados=Object.keys(grupos).sort();
-  const select=$('calcFilamento'); select.innerHTML='';
+  const select=$('pedFilamento'); const atual=select.value; select.innerHTML='';
   tiposOrdenados.forEach(tipo=>{
     const og=document.createElement('optgroup'); og.label=tipo;
     grupos[tipo].forEach(f=>{
       const o=document.createElement('option'); o.value=f.id;
-      o.textContent=`${f.nome} (${f.cor}) — ${brl(f.preco)}`; og.appendChild(o);
+      const precoKg=tipos.find(t=>t.nome===f.tipo)?.precoKg;
+      o.textContent=`${f.nome} (${f.cor}) — ${precoKg>0?brl(precoKg)+'/kg':'defina o preço do tipo'}`; og.appendChild(o);
     });
     select.appendChild(og);
   });
+  if(filamentos.some(f=>f.id===atual))select.value=atual;
   $('listaFilamentos').innerHTML=tiposOrdenados.map(tipo=>
-    `<div style="margin-bottom:.6rem"><span class="pill">${tipo}</span>`+
-    grupos[tipo].map(f=>`<div class="stat"><span>${f.nome} · ${f.cor} <span class="pill">${brl(f.custoPorGrama)}/g</span></span><button class="ghost" onclick="excluirFilamento('${f.id}')">remover</button></div>`).join('')+
+    `<div style="margin-bottom:.6rem"><span class="pill">${escaparTexto(tipo)}</span>`+
+    grupos[tipo].map(f=>`<div class="stat"><span>${escaparTexto(f.nome)} · ${escaparTexto(f.cor)}</span><button class="ghost" onclick="excluirFilamento('${f.id}')">remover</button></div>`).join('')+
     `</div>`
   ).join('')||'<p class="empty">Nenhum filamento cadastrado.</p>';
+  renderCustoItemPedido();
 }
 
 function calcularCusto(){
-  if(filamentos.length===0){alert('Adicione um filamento primeiro!');return}
-  const filamento=filamentos.find(f=>f.id===$('calcFilamento').value);
-  if(!filamento){alert('Selecione um filamento válido (recarregue a lista se necessário).');return}
   const pecaNome=$('pecaNome').value.trim()||'Peça sem nome';
   const peso=parseFloat($('pecaPeso').value), horas=parseFloat($('pecaHoras').value);
   const lucroPercentual=parseFloat($('lucro').value)||0;
-  if(!peso||!horas){alert('Preencha o peso e o tempo da peça!');return}
-  const custoMaterial=peso*filamento.custoPorGrama;
+  if(!Number.isFinite(peso)||peso<=0||!Number.isFinite(horas)||horas<=0||!Number.isFinite(lucroPercentual)||lucroPercentual<0){alert('Informe peso e tempo maiores que zero e uma margem válida!');return}
   const custoEnergia=(config.watts/1000)*horas*config.kwh;
-  const custoBase=custoMaterial+custoEnergia;
-  const precoVenda=custoBase*(1+lucroPercentual/100);
-  pendente={pecaNome,peso,horas,filamentoId:filamento.id,custoMaterial,custoEnergia,custoBase,lucroPercentual,precoSugerido:precoVenda};
+  pendente={pecaNome,peso,horas,custoEnergia,lucroPercentual};
   $('resultadoCard').classList.remove('hidden');
-  $('resNomePeca').textContent=`${pecaNome} — ${filamento.cor}`;
-  $('resMaterial').textContent=brl(custoMaterial);
+  $('resNomePeca').textContent=pecaNome;
+  $('resMaterial').textContent='Definido no pedido';
   $('resEnergia').textContent=brl(custoEnergia);
-  $('resCustoBase').textContent=brl(custoBase);
-  $('resVenda').textContent=brl(precoVenda);
+  $('resCustoBase').textContent='Definido no pedido';
+  $('resVenda').textContent='Definido no pedido';
 }
 
 function salvarProduto(){
   if(!pendente)return;
   let produto=produtos.find(p=>p.nome.toLowerCase()===pendente.pecaNome.toLowerCase());
   if(!produto){produto={id:uid(),nome:pendente.pecaNome,peso:pendente.peso,horas:pendente.horas,variantes:[]};produtos.push(produto)}
-  let variante=produto.variantes.find(v=>v.filamentoId===pendente.filamentoId);
-  const dados={filamentoId:pendente.filamentoId,custoMaterial:pendente.custoMaterial,custoEnergia:pendente.custoEnergia,
-    custoBase:pendente.custoBase,lucroPercentual:pendente.lucroPercentual,precoSugerido:pendente.precoSugerido};
-  if(variante)Object.assign(variante,dados);
-  else produto.variantes.push({id:uid(),...dados,precoVenda:'',vendidos:0});
+  produto.variantes.forEach(v=>{if(v.horas===undefined)v.horas=produto.horas});
+  Object.assign(produto,{peso:pendente.peso,horas:pendente.horas,lucroPercentual:pendente.lucroPercentual});
   saveJSON('produtos3d',produtos);
-  alert('Produto salvo! Veja a aba Vendas.');
+  renderProdutoSelectPedido();
+  alert('Produto salvo! Escolha o filamento ao adicionar cada item do pedido.');
 }
 
 function excluirVariante(prodId,varId){
   const produto=produtos.find(p=>p.id===prodId); if(!produto)return;
   produto.variantes=produto.variantes.filter(v=>v.id!==varId);
-  if(produto.variantes.length===0)produtos=produtos.filter(p=>p.id!==prodId);
   saveJSON('produtos3d',produtos); renderVendas();
 }
 
@@ -175,50 +188,91 @@ function atualizarVariante(prodId,varId,campo,valor){
   if(!v)return; v[campo]=parseFloat(valor)||0; saveJSON('produtos3d',produtos); renderVendas();
 }
 
+function atualizarPrecoProduto(prodId,valor){
+  const produto=produtos.find(p=>p.id===prodId);
+  const preco=Number(valor);
+  if(!produto||!Number.isFinite(preco)||preco<0)return;
+  produto.precoVenda=preco; saveJSON('produtos3d',produtos);
+}
+
+function excluirProduto(prodId){
+  produtos=produtos.filter(p=>p.id!==prodId);
+  saveJSON('produtos3d',produtos); renderVendas();
+}
+
 function renderVendas(){
   const tbody=document.querySelector('#tabelaVendas tbody'); tbody.innerHTML='';
   let totFat=0, totCusto=0;
-  produtos.forEach(p=>p.variantes.forEach(v=>{
+  produtos.forEach(p=>{
+    if(p.variantes.length===0){
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${escaparTexto(p.nome)}</td><td>No pedido</td><td class="mono">${p.horas||0}h</td><td>0h</td><td colspan="2">Definido no pedido</td>
+        <td><input type="number" min="0" step="0.01" aria-label="Preço de venda" value="${p.precoVenda||''}" placeholder="0,00" onchange="atualizarPrecoProduto('${p.id}',this.value)"></td>
+        <td>0</td><td class="mono">${brl(0)}</td><td class="mono">${brl(0)}</td><td><button class="ghost" onclick="excluirProduto('${p.id}')">✕</button></td>`;
+      tbody.appendChild(tr);
+    }
+    p.variantes.forEach(v=>{
     const fil=filamentos.find(f=>f.id===v.filamentoId);
     const vendidos=Number(v.vendidos)||0, precoVenda=Number(v.precoVenda)||0;
     const faturado=vendidos*precoVenda, custoTot=vendidos*v.custoBase, lucro=faturado-custoTot;
     totFat+=faturado; totCusto+=custoTot;
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${p.nome}</td><td>${fil?fil.nome+' · '+fil.cor:'—'}</td>
-      <td class="mono">${(p.horas||0)}h</td>
-      <td class="mono">${(vendidos*(p.horas||0)).toFixed(1).replace(/\.0$/,'')}h</td>
+    const horas=v.horas??p.horas??0;
+    tr.innerHTML=`<td>${escaparTexto(p.nome)}</td><td>${escaparTexto(v.filamentoNome||(fil?fil.nome+' · '+fil.cor:'—'))}</td>
+      <td class="mono">${horas}h</td>
+      <td class="mono">${(vendidos*horas).toFixed(1).replace(/\.0$/,'')}h</td>
       <td class="mono">${brl(v.custoBase)}</td><td class="mono">${brl(v.precoSugerido)}</td>
       <td><input type="number" step="0.01" value="${v.precoVenda||''}" placeholder="0,00" onchange="atualizarVariante('${p.id}','${v.id}','precoVenda',this.value)"></td>
       <td><input type="number" value="${v.vendidos||0}" onchange="atualizarVariante('${p.id}','${v.id}','vendidos',this.value)"></td>
       <td class="mono">${brl(faturado)}</td><td class="mono ${lucro>=0?'pos':'neg'}">${brl(lucro)}</td>
       <td><button class="ghost" onclick="excluirVariante('${p.id}','${v.id}')">✕</button></td>`;
     tbody.appendChild(tr);
-  }));
+    });
+  });
   $('vendasVazio').classList.toggle('hidden',produtos.length>0);
   $('totFaturado').textContent=brl(totFat); $('totCusto').textContent=brl(totCusto);
   $('totLucro').textContent=brl(totFat-totCusto);
 }
 
 function renderProdutoSelectPedido(){
-  const select=$('pedProduto'); select.innerHTML=produtos.map(p=>`<option value="${p.id}">${p.nome}</option>`).join('');
-  atualizarVariantesSelect();
+  const select=$('pedProduto'); const atual=select.value;
+  select.replaceChildren(...produtos.map(p=>new Option(p.nome,p.id)));
+  if(produtos.some(p=>p.id===atual))select.value=atual;
+  renderCustoItemPedido();
 }
 
-function atualizarVariantesSelect(){
+function calcularItemPedido(produto,filamento){
+  const tipo=tipos.find(t=>t.nome===filamento.tipo);
+  if(!(tipo?.precoKg>0))return null;
+  const lucroPercentual=produto.lucroPercentual??produto.variantes[0]?.lucroPercentual??0;
+  const custoMaterial=produto.peso*tipo.precoKg/1000;
+  const custoEnergia=(config.watts/1000)*produto.horas*config.kwh;
+  const custoBase=custoMaterial+custoEnergia;
+  const anterior=produto.variantes.findLast(v=>v.filamentoId===filamento.id);
+  return {filamentoId:filamento.id,filamentoNome:`${filamento.tipo} · ${filamento.nome} · ${filamento.cor}`,
+    precoKg:tipo.precoKg,peso:produto.peso,horas:produto.horas,
+    custoMaterial,custoEnergia,custoBase,lucroPercentual,precoSugerido:custoBase*(1+lucroPercentual/100),
+    precoVenda:produto.precoVenda??anterior?.precoVenda??''};
+}
+
+function renderCustoItemPedido(){
   const produto=produtos.find(p=>p.id===$('pedProduto').value);
-  $('pedVariante').innerHTML=(produto?.variantes||[]).map(v=>{
-    const fil=filamentos.find(f=>f.id===v.filamentoId);
-    return `<option value="${v.id}">${fil?fil.nome+' · '+fil.cor:'—'}</option>`;
-  }).join('');
+  const filamento=filamentos.find(f=>f.id===$('pedFilamento').value);
+  if(!produto||!filamento){$('pedCustoItem').textContent='Cadastre um produto e um filamento para adicionar itens ao pedido.';return}
+  const custos=calcularItemPedido(produto,filamento);
+  $('pedCustoItem').textContent=custos?`Por unidade: material ${brl(custos.custoMaterial)} + energia ${brl(custos.custoEnergia)} = custo ${brl(custos.custoBase)} · Venda sugerida ${brl(custos.precoSugerido)}`:'Defina o preço por kg desse tipo na aba Calculadora.';
 }
 
 function adicionarItemPedido(){
   const produto=produtos.find(p=>p.id===$('pedProduto').value);
   if(!produto){alert('Cadastre e salve um produto primeiro (aba Calculadora)!');return}
-  const varianteId=$('pedVariante').value, variante=produto.variantes.find(v=>v.id===varianteId);
-  const fil=filamentos.find(f=>f.id===variante?.filamentoId);
-  const quantidade=parseInt($('pedQtd').value)||1;
-  pedidoItensTemp.push({produtoId:produto.id,varianteId,quantidade,label:`${produto.nome} — ${fil?fil.nome+' · '+fil.cor:'—'} ×${quantidade}`});
+  const fil=filamentos.find(f=>f.id===$('pedFilamento').value);
+  if(!fil){alert('Cadastre e selecione um filamento para este item!');return}
+  const custos=calcularItemPedido(produto,fil);
+  if(!custos){alert('Defina o preço por kg desse tipo de filamento na aba Calculadora!');return}
+  const quantidade=Number($('pedQtd').value);
+  if(!Number.isSafeInteger(quantidade)||quantidade<1){alert('Informe uma quantidade inteira maior que zero!');return}
+  pedidoItensTemp.push({produtoId:produto.id,...custos,quantidade,label:`${produto.nome} — ${custos.filamentoNome} ×${quantidade}`});
   renderItensPedidoTemp();
 }
 
@@ -226,12 +280,23 @@ function removerItemPedidoTemp(i){ pedidoItensTemp.splice(i,1); renderItensPedid
 
 function renderItensPedidoTemp(){
   $('itensPedidoTemp').innerHTML=pedidoItensTemp.map((it,i)=>
-    `<div class="itemLinha"><span>${it.label}</span><button class="ghost" onclick="removerItemPedidoTemp(${i})">✕</button></div>`
+    `<div class="itemLinha"><span>${escaparTexto(it.label)}<br>Custo: ${brl(it.custoBase*it.quantidade)} · Sugerido: ${brl(it.precoSugerido*it.quantidade)}</span><button class="ghost" onclick="removerItemPedidoTemp(${i})">✕</button></div>`
   ).join('');
 }
 
 function criarPedido(){
   if(pedidoItensTemp.length===0){alert('Adicione pelo menos um item ao pedido!');return}
+  if(pedidoItensTemp.some(it=>!produtos.some(p=>p.id===it.produtoId))){alert('Um produto foi removido. Remova esse item e adicione outro ao pedido.');return}
+  pedidoItensTemp.forEach(it=>{
+    const produto=produtos.find(p=>p.id===it.produtoId);
+    let variante=produto.variantes.find(v=>v.filamentoId===it.filamentoId&&v.custoBase===it.custoBase&&v.precoSugerido===it.precoSugerido&&(v.horas??produto.horas)===it.horas&&v.precoVenda===it.precoVenda);
+    if(!variante){
+      const {produtoId,quantidade,label,...custos}=it;
+      variante={id:uid(),...custos,vendidos:0}; produto.variantes.push(variante);
+    }
+    it.varianteId=variante.id;
+  });
+  saveJSON('produtos3d',produtos);
   pedidos.push({id:uid(),cliente:$('pedCliente').value.trim(),descricao:$('pedDescricao').value.trim(),status:'fila',itens:pedidoItensTemp,contabilizado:false,criadoEm:Date.now()});
   saveJSON('pedidos3d',pedidos);
   $('pedCliente').value='';
@@ -279,7 +344,7 @@ function renderPedidos(){
         ${p.cliente?`<div class="kcliente">Cliente: ${escaparTexto(p.cliente)}</div>`:''}
         ${renderDataPedido(p.criadoEm)}
         ${p.descricao?`<div class="kdescricao">${escaparTexto(p.descricao)}</div>`:''}
-        ${p.itens.map(it=>`<div class="kitem">${it.label}</div>`).join('')}
+        ${p.itens.map(it=>`<div class="kitem">${escaparTexto(it.label)}</div>`).join('')}
       </div>`
     ).join('')||'<p class="empty" style="font-size:.85rem">Vazio</p>';
   });
@@ -295,7 +360,7 @@ function renderDataPedido(criadoEm){
 function escaparTexto(texto){
   const elemento=document.createElement('div');
   elemento.textContent=texto;
-  return elemento.innerHTML;
+  return elemento.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function salvarImpressora(){
