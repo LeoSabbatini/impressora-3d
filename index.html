@@ -46,35 +46,38 @@
   <div class="card">
     <h3>Novo filamento</h3>
     <label><span class="lbl">Tipo</span><select id="filTipo"></select></label>
-    <div class="rowAdd"><input type="text" id="novoTipo" placeholder="Novo tipo (ex: Nylon)"><button type="button" onclick="adicionarTipo()">+ Tipo</button></div>
+    <details style="margin-bottom:.9rem"><summary>Criar novo tipo de filamento</summary>
+      <label><span class="lbl">Nome do tipo</span><input type="text" id="novoTipo" placeholder="Ex: Nylon"></label>
+      <label><span class="lbl">Preço do tipo (R$/kg)</span><input type="number" id="novoTipoPreco" min="0.01" step="0.01" placeholder="120.00"></label>
+      <button type="button" onclick="adicionarTipo()">Adicionar tipo</button>
+    </details>
     <label><span class="lbl">Marca / nome</span><input type="text" id="filNome" placeholder="Esun"></label>
     <label><span class="lbl">Cor</span><input type="text" id="filCor" placeholder="Preto"></label>
-    <div class="row2">
-      <label><span class="lbl">Preço (R$)</span><input type="number" id="filPreco" step="0.01" placeholder="120.00"></label>
-      <label><span class="lbl">Peso (g)</span><input type="number" id="filPeso" placeholder="1000"></label>
-    </div>
+    <p class="empty">O preço por kg é definido pelo tipo, não pela marca ou cor.</p>
     <button class="primary" onclick="adicionarFilamento()">Adicionar filamento</button>
+    <h3 style="margin-top:1.25rem">Preços por tipo (R$/kg)</h3>
+    <div id="listaTipos"></div>
     <div id="listaFilamentos" style="margin-top:.9rem"></div>
   </div>
 </div>
 <div>
   <div class="card">
     <h3>Nova impressão</h3>
-    <label><span class="lbl">Filamento</span><select id="calcFilamento"></select></label>
+    <p class="empty">Cadastre a peça sem filamento. Escolha a marca e a cor em cada item do pedido.</p>
     <label><span class="lbl">Nome da peça</span><input type="text" id="pecaNome" placeholder="Vaso Groot"></label>
     <div class="row2">
       <label><span class="lbl">Peso da peça (g)</span><input type="number" id="pecaPeso" placeholder="150"></label>
       <label><span class="lbl">Tempo (h)</span><input type="number" id="pecaHoras" step="0.1" placeholder="5.5"></label>
     </div>
     <label><span class="lbl">Margem de lucro sugerida (%)</span><input type="number" id="lucro" placeholder="100"></label>
-    <button class="primary" style="width:100%" onclick="calcularCusto()">Calcular custo final</button>
+    <button class="primary" style="width:100%" onclick="calcularCusto()">Preparar impressão</button>
   </div>
   <div class="card result hidden" id="resultadoCard">
     <h3 id="resNomePeca"></h3>
     <dl>
       <dt>Custo de material</dt><dd id="resMaterial"></dd>
       <dt>Custo de energia</dt><dd id="resEnergia"></dd>
-      <dt>Custo base de produção</dt><dd id="resCustoBase"></dd>
+      <dt>Custo total de produção</dt><dd id="resCustoBase"></dd>
       <dt class="tot">Preço sugerido de venda</dt><dd class="tot" id="resVenda"></dd>
     </dl>
     <button class="primary" style="width:100%;margin-top:1rem" onclick="salvarProduto()">Salvar como produto</button>
@@ -105,9 +108,10 @@
   <label><span class="lbl">Nome do cliente</span><input type="text" id="pedCliente" autocomplete="name" placeholder="Nome do cliente"></label>
   <label><span class="lbl">Descrição (opcional)</span><textarea id="pedDescricao" rows="3" placeholder="Detalhes e observações do pedido"></textarea></label>
   <div class="row2">
-    <label><span class="lbl">Produto</span><select id="pedProduto" onchange="atualizarVariantesSelect()"></select></label>
-    <label><span class="lbl">Filamento/cor</span><select id="pedVariante"></select></label>
+    <label><span class="lbl">Produto</span><select id="pedProduto" onchange="renderCustoItemPedido()"></select></label>
+    <label><span class="lbl">Filamento/cor</span><select id="pedFilamento" onchange="renderCustoItemPedido()"></select></label>
   </div>
+  <div id="pedCustoItem" class="empty" aria-live="polite"></div>
   <div class="rowAdd" style="align-items:flex-end">
     <label style="flex:1;margin:0"><span class="lbl">Quantidade</span><input type="number" id="pedQtd" min="1" value="1"></label>
     <button type="button" onclick="adicionarItemPedido()">+ Item</button>
